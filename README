@@ -1,0 +1,28 @@
+
+    PA (Parser arguments for C)
+
+    My alternative to getopt by GNU since it does not provide
+    the last flagname used, and as an exercise maybe...
+
+    It's pretty simple to use, you can take a look into
+    'demo.c' and test it by compiling it and running it
+
+    An argument can be given as:
+    -a      <argument>              by id
+    --add   <argument>              by flagname
+    --add=<argument>                unix-like
+
+    If a flag does not take an argument but an argument
+    is given it will be interpreted as a positional argument
+
+    --does-not-take-arg <argument-dahhh> 
+       \                       `~~~~~~~~~> this is given as an independent thing (pa_ret_pos_arg)
+        `~~~~~~~~ id of this argument is given
+
+    If a flag requires an argument but no argument is given
+    it does not terminate the program, it will return `pa_ret_missed_arg`
+    and it will be handled by the programmer as they want.
+
+    In fact the only two errors which can terminate the program are:
+      * Cannot allocate memory
+      * pa_option structure is bad defined
