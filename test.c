@@ -1,22 +1,60 @@
 #include "geto.h"
 
+#include <stdio.h>
+
 int main (int argc, char **argv) {
 	struct GetoFlag flags[] = {
 		{
-			.longname = "nirvana",
-			.description = "",
-			.shortname = 'n',
-			.opts = GETO_ARG_IS_OPTIONAL
+			.longname    = "verbose",
+			.description = "enable verbose output",
+			.shortname   = 'v',
+			.opts        = GETO_ARG_IS_NONEXISTENT
 		},
 		{
-			.longname = "aaaaaaaaaaaaaaaaa",
-			.description = "",
-			.shortname = 'p',
-			.opts = GETO_ARG_IS_NONEXISTENT
+			.longname    = "output",
+			.description = "output file path",
+			.shortname   = 'o',
+			.opts        = GETO_ARG_IS_MANDATORY | GETO_ARG_TYPE_TEXT
+		},
+		{
+			.longname    = "retries",
+			.description = "number of retry attempts",
+			.shortname   = 'r',
+			.opts        = GETO_ARG_IS_MANDATORY | GETO_ARG_TYPE_UI32
+		},
+		{
+			.longname    = "timeout",
+			.description = "connection timeout in seconds",
+			.shortname   = 't',
+			.opts        = GETO_ARG_IS_MANDATORY | GETO_ARG_TYPE_SI32
+		},
+		{
+			.longname    = "scale",
+			.description = "scaling factor",
+			.shortname   = 's',
+			.opts        = GETO_ARG_IS_MANDATORY | GETO_ARG_TYPE_DOUB
+		},
+		{
+			.longname    = "help",
+			.description = "display usage information",
+			.shortname   = 'h',
+			.opts        = GETO_ARG_IS_NONEXISTENT
 		},
 	};
 
 	struct GetoParsed p;
-	geto_parse(argc, argv, 2, flags, &p);
+	geto_parse(argc, argv, 6, flags, &p);
+
+	if (p.error != GETO_ERROR_NONE) {
+		printf("fault: %d\n", p.error);
+		return 0;
+	}
+
+	for (unsigned short i = 0; i < 6; i++) {
+		if (flags[i].seen) {
+			printf("parsed ok: %c (%d)\n", flags[i].shortname, flags[i].argset);
+		}
+	}
+
 	return 0;
 }
