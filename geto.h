@@ -1,119 +1,51 @@
 #ifndef GETO_H
 #define GETO_H
 
-#define GETO_FLAG_MANDATORY 0b10000000
-#define GETO_FLAG_OPTIONAL  0b00000000
+#define GETO_ARG_IS_NONEXISTENT 0b00000000
+#define GETO_ARG_IS_OPTIONAL    0b00000001
+#define GETO_ARG_IS_MANDATORY   0b00000010
 
-#define GETO_ARG_MANDATIORY 0b01100000
-#define GETO_ARG_OPTIONAL   0b01000000
-#define GETO_ARG_NONEXISTEN 0b00100000
+#define GETO_ARG_TYPE_TEXT      0b00000100
+#define GETO_ARG_TYPE_DOUB      0b00001000
+#define GETO_ARG_TYPE_UI64      0b00010000
+#define GETO_ARG_TYPE_UI32      0b00100000
+#define GETO_ARG_TYPE_SI64      0b01000000
+#define GETO_ARG_TYPE_SI32      0b10000000
 
-#define GETO_ARG_IS_TEXT    0b00000111
-#define GETO_ARG_IS_UINT64  0b00000110
-#define GETO_ARG_IS_DOUBLE  0b00000101
-#define GETO_ARG_IS_INT64   0b00000100
-#define GETO_ARG_IS_INT32   0b00000011
-#define GETO_ARG_IS_UINT32  0b00000010
-
-/*
- * Represents the number of ways a program can be executed
- * (see GetoUsageContext)
- *
- * by default it is five, but it can be changed to fit programmer
- * necessities
- */
-#define GETO_MAX_USAGE_UNITS 5
-
-#define GETO_STDOUT_FD 1
-#define GETO_STDERR_FD 2
+#define GETO_IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 4))
 
 typedef unsigned char getopts_t;
 
-/*
- * Defines a container in which flags can be defined by the programmer
- * $ program -v --message "something"
- *           /     `      `~~~~~~~~~ argumemt (text)
- *       shortname  `- longname 
- *
- * description: tiny description of what the flag is used to (in case
- * usage is displayed)
- *
- * options: specfies the following via bitwise
- *
- * x-----:
- *   1: flag is mandatory
- *   0: flag is optional
- *
- * -xx---:
- *   11: takes an argument
- *   10: flag is optional
- *   01: does not take argument
- *
- * ---xxx:
- *   111: argument is text
- *   110: argument is unsigned integer 64
- *   101: argument is double
- *   100: argument is integer 64
- *   011: argument is integer 32
- *   010: argument is unsigned integer 32
- */
+enum GetoError {
+	GETO_ERROR_NONE          = 0,
+	GETO_ERROR_DUP_SHORTNAME = 1,
+	GETO_ERROR_DUP_LONGNAME  = 2,
+	GETO_ERROR_BAD_LONGNAME  = 3,
+	GETO_ERROR_BAD_SHORTNAME = 4
+};
+
 struct GetoFlag {
 	union {
-		char *asText;
-		unsigned long  asUint64;
-		double asDouble;
-		long  asInt64;
-		int  asInt32;
-		unsigned int  asUint32;
+		char *astext;
+		double asdouble;
+		unsigned long asuint64;
+		unsigned int asuint32;
+		signed long asint64;
+		signed int asint32;
 	} argument;
 	const char *longname;
 	const char *description;
 	const char shortname;
-	const getopts_t options;
+	const getopts_t opts;
 };
 
-struct GetoUsageContext {
-	/*
-	 * A usage unit is a way in which the caller program can be used or executed by the user.
-	 * For example, these are some ways in which vim can be executed properly.
-	 *
-	 * ~~~~~> displayed by geto (default)
-	 * Usage: vim [arguments] [file ..]       edit specified file(s)
-	 *    or: vim [arguments] -               read text from stdin
-	 *    or: vim [arguments] -t tag          edit file where tag is defined
-	 *    or: vim [arguments] -q [errorfile]  edit file with first error
-	 *    ~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	 *    `        `                          `
-	 *    |         `---> like                 `---> description
-	 *    v
-	 * displayed by geto (default)
-	 */
-	struct {
-		const char *like;
-		const char *description;
-	} units [GETO_MAX_USAGE_UNITS];
-	const char *programName;
-	const char *programDescription;
-	const char *notes;
-	const unsigned int writeTo;
-	const unsigned short noUnitsDef;
-	const unsigned short noFlagsDef;
+struct GetoParsed {
+	struct GetoFlag *found;
+	struct GetoFlag *lastSeen;
+	char **positionalArgs;
+	enum GetoError error;
 };
 
-enum GetoErrorType {
-	GETO_ERROR_NONE                 = 0,
-	GETO_ERROR_DUPLICATED_SHORTNAME = 1,
-	GETO_ERROR_DUPLICATED_LONGNAME  = 2
-};
-
-
-struct GetoAns {
-	struct GetoFlag *flagsFound;
-	struct GetoFlag *lastFlagSeen;
-	enum GetoErrorType error;
-};
-
-void geto_print_usage (const struct GetoUsageContext, struct GetoFlag*);
-unsigned short geto_go_for_it (const unsigned int, char**, struct GetoAns*, struct GetoFlag*, const unsigned short);
+unsigned short geto_parse (const unsigned int, char**, const unsigned short, struct GetoFlag*, struct GetoParsed*);
 
 #endif

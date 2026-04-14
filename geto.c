@@ -1,138 +1,108 @@
 #include "geto.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
 
-#define INTERNAL_GROWING_FACTOR 4
-#define INTERNAL_TRUE           1
-#define INTERNAL_FALSE          0
+struct Map {
+	struct GetoFlag *aliases[26 * 2 + 10];
+	struct GetoFlag *flags;
+	unsigned short noflags;
+};
 
-typedef unsigned char boolean_t;
+static enum GetoError check_integrity (struct GetoFlag*, const unsigned short);
+static unsigned short normalize_alias (const char);
 
-static enum GetoErrorType flags_are_well_formed (struct GetoFlag*, const unsigned short);
-static unsigned short normalize_shortname (const unsigned char);
+static void mapflags (struct Map*);
+static int cmpflg (const void*, const void*);
 
-void geto_print_usage (const struct GetoUsageContext context, struct GetoFlag *flags) {
-	if (context.programName == NULL || context.programDescription == NULL || flags == NULL) {
-		return;
-	}
-	if (context.noUnitsDef >= GETO_MAX_USAGE_UNITS) {
-		return;
-	}
-
-	unsigned short pad1 = 0, pad2 = 0;
-	for (unsigned short i = 0; i < context.noUnitsDef; i++) {
-		const unsigned short width = (unsigned short) strlen(context.units[i].like);
-		pad1 = (pad1 < width) ? width : pad1;
-	}
-
-	dprintf(context.writeTo, "\x1b[1m%s\x1b[0m - %s (last compilation on %s at %s)\n\n\x1b[1mUsage\x1b[0m:\n",
-		context.programName,
-		context.programDescription,
-		__DATE__,
-		__TIME__
-	);
-
-	for (unsigned short i = 0; i < context.noUnitsDef; i++) {
-		dprintf(
-			context.writeTo,
-			"   %s %-*s   %s\n",
-			context.programName,
-			pad1,
-			context.units[i].like,
-			context.units[i].description
-		);
-	}
-
-	for (unsigned short i = 0; i < context.noFlagsDef; i++) {
-		const unsigned short width = (unsigned short) strlen(flags[i].longname);
-		pad2 = (pad2 < width) ? width : pad2;
-	}
-
-	if (pad1 > pad2) { pad2 = pad1 - 3; }
-	dprintf(context.writeTo, "\x1b[1mArguments\x1b[0m:\n");
-
-	for (unsigned short i = 0; i < context.noFlagsDef; i++) {
-		dprintf(context.writeTo, "   -%c or --%-*s  %s\n", flags[i].shortname, pad2, flags[i].longname, flags[i].description);
-	}
-
-	if (context.notes != NULL) {
-		dprintf(context.writeTo, "\x1b[1mNotes\x1b[0m:\n   %s\n", context.notes);
-	}
-}
-
-unsigned short geto_go_for_it (const unsigned int argc, char **argv, struct GetoAns *ans, struct GetoFlag *flags, const unsigned short noFlagsDef) {
-	if (flags == NULL) {
-		return 0;
-	}
-	ans->error = flags_are_well_formed(flags, noFlagsDef);
-	if (ans->error != GETO_ERROR_DUPLICATED_SHORTNAME) {
+unsigned short geto_parse (const unsigned int argc, char **argv, const unsigned short noflags, struct GetoFlag *flags, struct GetoParsed *parsed) {
+	if (!noflags || !flags || argc == 1 || !argv || !parsed) {
 		return 0;
 	}
 
-	ans->flagsFound = (struct GetoFlag*) calloc(INTERNAL_GROWING_FACTOR, sizeof(*ans->flagsFound));
-	assert(ans->flagsFound);
+	memset(parsed, 0, sizeof(*parsed));
+	parsed->error = check_integrity(flags, noflags);
 
-	for (unsigned int i = 1; i < argc; i++) {
-		const char *element = argv[i];
-		const unsigned short length = (unsigned short) strlen(element);
+	if (parsed->error) {
+		return 0;
+	}
 
-		/*
-		 * end of arguments; whatever comes next are positional arguments
-		 */
-		if (length == 1 && *element == '-') {
+	struct Map map = {
+		.flags = flags,
+		.noflags = noflags
+	};
+	mapflags(&map);
+
+	for (unsigned short i = 1; i < argc; i++) {
+	}
+}
+
+static enum GetoError check_integrity (struct GetoFlag *flags, const unsigned short noflags) {
+	unsigned char aliaseen[26 * 2 + 10] = {0};
+
+	for (unsigned short i = 0; i < noflags; i++) {
+		const char shortname = flags[i].shortname;
+
+		if (!isalnum(shortname)) {
+			return GETO_ERROR_BAD_SHORTNAME;
 		}
-		/*
-		 * using shortname flags (-h, -e, -A, etc)
-		 */
-		else if (length == 2 && *element == '-' && isalpha(element[1])) {
+
+		const char *longname = flags[i].longname;
+		if (!longname) {
+			return GETO_ERROR_BAD_LONGNAME;
 		}
 	}
 
-	return 0;
-}
-
-static enum GetoErrorType flags_are_well_formed (struct GetoFlag *flags, const unsigned short noFlagsDef) {
-	boolean_t shortnameTaken[26 * 2 + 10] = {INTERNAL_FALSE};
-
-	/*
-	 * Since no more than 20 flags are defined (or at least it's not likely to happen)
-	 * a simple double loop will help to know if there are duplicated longnames
-	 */
-	for (unsigned short i = 0; i < noFlagsDef; i++) {
-		const unsigned short position = normalize_shortname(flags[i].shortname);
-		if (shortnameTaken[position] == INTERNAL_TRUE) {
-			return GETO_ERROR_DUPLICATED_SHORTNAME;
+	for (unsigned short i = 0; i < noflags; i++) {
+		const unsigned short pos = normalize_alias(flags[i].shortname);
+		if (aliaseen[pos]) {
+			return GETO_ERROR_DUP_SHORTNAME;
 		}
 
-		shortnameTaken[position] = INTERNAL_TRUE;
-		const size_t thislength = strlen(flags[i].longname);
+		const char *thisLongname = flags[i].longname;
+		const size_t thisLength = strlen(thisLongname);
 
-		for (unsigned short j = i + 1; j < noFlagsDef; j++) {
-			const size_t thatlength = strlen(flags[i].longname);
-			if (thatlength != thislength) {
+		for (unsigned short j = i + 1; j < noflags; j++) {
+			const char *thatLongname = flags[j].longname;
+			const size_t thatLength = strlen(thatLongname);
+
+			if (thisLength != thatLength) {
 				continue;
 			}
-
-			if (!strncmp(flags[i].longname, flags[j].longname, thatlength)) {
-				return GETO_ERROR_DUPLICATED_LONGNAME;
+			if (!strncmp(thisLongname, thatLongname, thatLength)) {
+				return GETO_ERROR_DUP_LONGNAME;
 			}
 		}
+		aliaseen[pos] = 1;
 	}
 
 	return GETO_ERROR_NONE;
 }
 
-static unsigned short normalize_shortname (const unsigned char shortname) {
-	if (islower(shortname)) {
-		return shortname - 'a';
+static unsigned short normalize_alias (const char alias) {
+	if (islower(alias)) {
+		return alias - 'a';
 	}
-	if (isupper(shortname)) {
-		return shortname - 'A' + 26;
+	if (isupper(alias)) {
+		return alias - 'A' + 26;
 	}
+	return alias - '0' + 52;
+}
 
-	return shortname - '0' + 52;
+static void mapflags (struct Map *map) {
+	qsort(map->flags, map->noflags, sizeof(*map->flags), cmpflg);
+
+	for (unsigned short i = 0; i < map->noflags; i++) {
+		const unsigned short pos = normalize_alias(map->flags[i].shortname);
+		map->aliases[pos] = &map->flags[i];
+	}
+}
+
+static int cmpflg (const void *f1, const void *f2) {
+	struct GetoFlag *_f1 = (struct GetoFlag*) f1;
+	struct GetoFlag *_f2 = (struct GetoFlag*) f2;
+
+	return strcmp(_f1->longname, _f2->longname);
 }
