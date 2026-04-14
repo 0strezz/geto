@@ -1,7 +1,7 @@
 #include "geto.h"
 #include <stdio.h>
 
-static void usage () {
+int main (int argc, char **argv) {
 	struct GetoUsageContext context = {
 		.units = {
 			{"[arguments] [file ..]", "edit specified file(s)"},
@@ -12,8 +12,8 @@ static void usage () {
 		.programName = "vim",
 		.programDescription = "Vi IMproved 9.1",
 		.writeTo = GETO_STDOUT_FD,
-		.unitsDefined = 4,
-		.flagsDefined = 2,
+		.noUnitsDef = 4,
+		.noFlagsDef = 2,
 		.notes = "this is a test"
 	};
 
@@ -32,10 +32,18 @@ static void usage () {
 		}
 	};
 
-	geto_print_usage(context, flags);
-}
-
-int main () {
-	usage();
+	struct GetoAns ans;
+	const unsigned short parsed = geto_go_for_it(argc, argv, &ans, flags, 2);
+	switch (ans.error) {
+		case GETO_ERROR_DUPLICATED_SHORTNAME: {
+			printf("dup shortname\n");
+			break;
+		}
+		case GETO_ERROR_DUPLICATED_LONGNAME: {
+			printf("dup longname\n");
+			break;
+		}
+	}
+	//geto_print_usage(context, flags);
 	return 0;
 }
