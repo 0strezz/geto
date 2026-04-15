@@ -1,17 +1,10 @@
-/*
- *             __     
- *   ___ ____ / /____ 
- *  / _ `/ -_) __/ _ \
- *  \_, /\__/\__/\___/
- * /___/              
- *
- */
 #include "geto.h"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define ARGUMENT_NEED_MASK 0b00000011
 #define ARGUMENT_TYPE_MASK 0b11111100
@@ -21,6 +14,8 @@
 
 #define ARG_WAS_SET     1
 #define ARG_WASNT_SET   0
+
+#define POSITIONAL_ARGS_GROW_FACTOR 8
 
 /*
  * defines a simple mapper in which the parser can access flags
@@ -42,6 +37,7 @@ static enum GetoError parse_shortname (const char*, const size_t, struct Map*, s
 static enum GetoError assign_argument (const char*, struct GetoFlag*);
 
 static enum GetoError check_flags_its_arg (struct GetoFlag*);
+static enum GetoError parse_longname (const char*, const size_t, struct Map*, struct GetoFlag**);
 
 void geto_parse (const unsigned int argc, char **argv, const unsigned short noflags, struct GetoFlag *flags, struct GetoParsed *parsed) {
 	if (!noflags || !flags || argc == 1 || !argv || !parsed) {
@@ -60,6 +56,7 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 
 	struct GetoFlag *lastseen = NULL;
 	unsigned short ffound = 0;
+	unsigned int positionalArgsCap = 0;
 
 	for (unsigned short i = 1; i < argc && !parsed->error; i++) {
 		const char *argval = argv[i];
@@ -68,14 +65,36 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 		parsed->lastArgvalueSeen = (char*) argval;
 		parsed->lastArgc = i;
 
+		if (positionalArgsCap != 0) {
+			if (positionalArgsCap == parsed->nopositional) {
+				positionalArgsCap += POSITIONAL_ARGS_GROW_FACTOR;
+				parsed->positionalArgs = (char**) reallocarray(parsed->positionalArgs, positionalArgsCap, sizeof(*parsed->positionalArgs));
+				assert(parsed->positionalArgs);
+			}
+
+			parsed->positionalArgs[parsed->nopositional++] = (char*) argval;
+			continue;
+		}
 		if (argvalen >= 2 && *argval == '-' && isalnum(argval[1])) {
 			parsed->error = parse_shortname(argval, argvalen, &map, &lastseen);
+		}
+		else if (argvalen >= 3 && *argval == '-' && argval[1] == '-' && isalnum(argval[2])) {
+			parsed->error = parse_longname(argval, argvalen, &map, &lastseen);
+		}
+		else if (argvalen == 2 && *argval == '-' && argval[1] == '-') {
+			parsed->nopositional = 0;
+			parsed->positionalArgs = (char**) calloc(POSITIONAL_ARGS_GROW_FACTOR, sizeof(*parsed->positionalArgs));
+			positionalArgsCap = POSITIONAL_ARGS_GROW_FACTOR;
+			assert(parsed->positionalArgs);
 		}
 		else {
 			parsed->error = assign_argument(argval, lastseen);
 		}
 	}
 
+	if (parsed->error != GETO_ERROR_NONE) {
+		return;
+	}
 	parsed->error = check_flags_its_arg(lastseen);
 }
 
@@ -169,8 +188,6 @@ static enum GetoError parse_shortname (const char *argval, const size_t argvalen
 		if ((((*lastseen)->opts & ARGUMENT_NEED_MASK) == GETO_ARG_IS_MANDATORY) && ((i + 1) != argvalen)) {
 			return GETO_ERROR_MISSING_ARG;
 		}
-
-		printf("shortname: -%c (%p)\n", name, *lastseen);
 	}
 
 	return GETO_ERROR_NONE;
@@ -213,8 +230,6 @@ static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *ow
 			break;
 		}
 	}
-
-	printf("argument: '%s' for %p\n", argvalue, owner);
 	owner->argset = ARG_WAS_SET;
 	return GETO_ERROR_NONE;
 }
@@ -223,5 +238,37 @@ static enum GetoError check_flags_its_arg (struct GetoFlag *flag) {
 	if (flag && (flag->opts & ARGUMENT_NEED_MASK) == GETO_ARG_IS_MANDATORY) {
 		return (flag->argset) ? GETO_ERROR_NONE : GETO_ERROR_MISSING_ARG;
 	}
+	return GETO_ERROR_NONE;
+}
+
+static enum GetoError parse_longname (const char *argval, const size_t argvalen, struct Map *map, struct GetoFlag **owner) {
+	const unsigned short assumptionPos = normalize_alias(argval[2]);
+	const char *ogname = argval + 2;
+	const size_t cmpbytes = argvalen - 2;
+
+	*owner = NULL;
+	if (!strncmp(ogname, map->shortnames[assumptionPos]->longname, cmpbytes)) {
+		*owner = map->shortnames[assumptionPos];
+		goto ownerset;
+	}
+
+	for (unsigned short i = 0; i < map->noflags && *owner == NULL; i++) {
+		const char *flagname = map->flagsorted[i].longname;
+		const size_t length = strlen(flagname);
+
+		if (length != cmpbytes) {
+			continue;
+		}
+		if (!strncmp(flagname, ogname, cmpbytes)) {
+			*owner = &map->flagsorted[i];
+		}
+	}
+
+	if (*owner == NULL) {
+		return GETO_ERROR_UNKNOWN_LONG;
+	}
+
+ownerset:
+	(*owner)->seen = FLAG_WAS_SEEN;
 	return GETO_ERROR_NONE;
 }

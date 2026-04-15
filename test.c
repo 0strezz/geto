@@ -40,10 +40,16 @@ int main (int argc, char **argv) {
 			.shortname   = 'h',
 			.opts        = GETO_ARG_IS_NONEXISTENT
 		},
+		{
+			.longname    = "hidden",
+			.description = "does not display information",
+			.shortname   = 'H',
+			.opts        = GETO_ARG_IS_NONEXISTENT
+		}
 	};
 
 	struct GetoParsed p;
-	geto_parse(argc, argv, 6, flags, &p);
+	geto_parse(argc, argv, 7, flags, &p);
 
 	if (p.error != GETO_ERROR_NONE) {
 		printf("fault: %d\n", p.error);
@@ -54,6 +60,10 @@ int main (int argc, char **argv) {
 		if (flags[i].seen) {
 			printf("parsed ok: %c (%d)\n", flags[i].shortname, flags[i].argset);
 		}
+	}
+
+	for (unsigned short i = 0; i < p.nopositional; i++) {
+		printf("pos #%d: %s\n", i, p.positionalArgs[i]);
 	}
 
 	return 0;

@@ -27,6 +27,7 @@ enum GetoError {
 	GETO_ERROR_UNKNOWN_SHORT   = 5,
 	GETO_ERROR_UNNECESSARY_ARG = 6,
 	GETO_ERROR_MISSING_ARG     = 7,
+	GETO_ERROR_UNKNOWN_LONG    = 8
 };
 
 struct GetoFlag {
@@ -54,6 +55,7 @@ struct GetoParsed {
 	char *lastArgvalueSeen;
 	char **positionalArgs;
 	unsigned short lastArgc;
+	unsigned short nopositional;
 	enum GetoError error;
 };
 
