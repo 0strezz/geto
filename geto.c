@@ -40,7 +40,7 @@ static enum GetoError check_flags_its_arg (struct GetoFlag*);
 static enum GetoError parse_longname (const char*, const size_t, struct Map*, struct GetoFlag**);
 
 void geto_parse (const unsigned int argc, char **argv, const unsigned short noflags, struct GetoFlag *flags, struct GetoParsed *parsed) {
-	if (!noflags || !flags || argc == 1 || !argv || !parsed) {
+	if ((noflags == 0) || (flags == NULL) || (argc == 1) || (argv == NULL) || (parsed == NULL)) {
 		return;
 	}
 
@@ -183,6 +183,7 @@ static enum GetoError parse_shortname (const char *argval, const size_t argvalen
 		}
 
 		map->shortnames[pos]->seen = FLAG_WAS_SEEN;
+		map->shortnames[pos]->argset = ARG_WASNT_SET;
 		*lastseen = map->shortnames[pos];
 
 		if ((((*lastseen)->opts & ARGUMENT_NEED_MASK) == GETO_ARG_IS_MANDATORY) && ((i + 1) != argvalen)) {
@@ -247,9 +248,12 @@ static enum GetoError parse_longname (const char *argval, const size_t argvalen,
 	const size_t cmpbytes = argvalen - 2;
 
 	*owner = NULL;
-	if (!strncmp(ogname, map->shortnames[assumptionPos]->longname, cmpbytes)) {
-		*owner = map->shortnames[assumptionPos];
-		goto ownerset;
+	if (map->shortnames[assumptionPos] != NULL) {
+		const struct GetoFlag *asmpflag = map->shortnames[assumptionPos];
+		if (!strncmp(ogname, asmpflag->longname, strlen(asmpflag->longname))) {
+			*owner = map->shortnames[assumptionPos];
+			goto ownerset;
+		}
 	}
 
 	for (unsigned short i = 0; i < map->noflags && *owner == NULL; i++) {
@@ -270,5 +274,6 @@ static enum GetoError parse_longname (const char *argval, const size_t argvalen,
 
 ownerset:
 	(*owner)->seen = FLAG_WAS_SEEN;
+	(*owner)->argset = ARG_WASNT_SET;
 	return GETO_ERROR_NONE;
 }
