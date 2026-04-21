@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#define ARGUMENT_NEED_MASK 0b00000011
-#define ARGUMENT_TYPE_MASK 0b11111100
+#define ARGUMENT_NEED_MASK 0x3
+#define ARGUMENT_TYPE_MASK 0xFC
 
 #define FLAG_WAS_SEEN   1
 #define FLAG_WASNT_SEEN 0
@@ -55,7 +55,6 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 	mapflags(&map);
 
 	struct GetoFlag *lastseen = NULL;
-	unsigned short ffound = 0;
 	unsigned int positionalArgsCap = 0;
 
 	for (unsigned short i = 1; i < argc && !parsed->error; i++) {

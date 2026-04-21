@@ -1,20 +1,20 @@
 #ifndef GETO_H
 #define GETO_H
 
-#define GETO_ARG_IS_NONEXISTENT 0b00000000
-#define GETO_ARG_IS_OPTIONAL    0b00000001
-#define GETO_ARG_IS_MANDATORY   0b00000010
+#define GETO_ARG_IS_NONEXISTENT 0x1
+#define GETO_ARG_IS_OPTIONAL    0x1
+#define GETO_ARG_IS_MANDATORY   0x2
 
-#define GETO_ARG_TYPE_TEXT      0b00000100
-#define GETO_ARG_TYPE_DOUB      0b00001000
-#define GETO_ARG_TYPE_UI64      0b00010000
-#define GETO_ARG_TYPE_UI32      0b00100000
-#define GETO_ARG_TYPE_SI64      0b01000000
-#define GETO_ARG_TYPE_SI32      0b10000000
+#define GETO_ARG_TYPE_TEXT      0x4
+#define GETO_ARG_TYPE_DOUB      0x8
+#define GETO_ARG_TYPE_UI64      0x16
+#define GETO_ARG_TYPE_UI32      0x32
+#define GETO_ARG_TYPE_SI64      0x64
+#define GETO_ARG_TYPE_SI32      0x128
 
 #define GETO_IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 4))
 
-typedef unsigned char getopts_t;
+typedef unsigned short getopts_t;
 typedef unsigned char geto_flgseen_t;
 typedef unsigned char geto_argset_t;
 
