@@ -43,7 +43,7 @@ int main (int argc, char **argv) {
 		{
 			.longname    = "hidden",
 			.description = "does not display information",
-			.shortname   = 'H',
+			.shortname   = '*',
 			.opts        = GETO_ARG_IS_NONEXISTENT
 		}
 	};
@@ -56,7 +56,7 @@ int main (int argc, char **argv) {
 		return 0;
 	}
 
-	for (unsigned short i = 0; i < 6; i++) {
+	for (unsigned short i = 0; i < 7; i++) {
 		if (flags[i].seen) {
 			printf("parsed ok: %c (%d)\n", flags[i].shortname, flags[i].argset);
 		}

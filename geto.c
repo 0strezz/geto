@@ -9,13 +9,15 @@
 #define ARGUMENT_NEED_MASK 0x3
 #define ARGUMENT_TYPE_MASK 0xFC
 
-#define FLAG_WAS_SEEN   1
-#define FLAG_WASNT_SEEN 0
+#define FLAG_WAS_SEEN      0x1
+#define FLAG_WASNT_SEEN    0x0
 
-#define ARG_WAS_SET     1
-#define ARG_WASNT_SET   0
+#define ARG_WAS_SET        0x1
+#define ARG_WASNT_SET      0x0
 
-#define POSITIONAL_ARGS_GROW_FACTOR 8
+#define POSITIONAL_ARGS_GROW_FACTOR 0x8
+
+#define IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 4))
 
 /*
  * defines a simple mapper in which the parser can access flags
@@ -26,6 +28,8 @@ struct Map {
 	struct GetoFlag *flagsorted;
 	unsigned short noflags;
 };
+
+static void abort_programmer_fault (const enum GetoError);
 
 static enum GetoError check_integrity (struct GetoFlag*, const unsigned short);
 static unsigned short normalize_alias (const char);
@@ -39,16 +43,17 @@ static enum GetoError assign_argument (const char*, struct GetoFlag*);
 static enum GetoError check_flags_its_arg (struct GetoFlag*);
 static enum GetoError parse_longname (const char*, const size_t, struct Map*, struct GetoFlag**);
 
+static struct GetoFlag *get_longname_flag (const char*, const size_t, struct Map *);
+
 void geto_parse (const unsigned int argc, char **argv, const unsigned short noflags, struct GetoFlag *flags, struct GetoParsed *parsed) {
+	memset(parsed, 0, sizeof(*parsed));
 	if ((noflags == 0) || (flags == NULL) || (argc == 1) || (argv == NULL) || (parsed == NULL)) {
 		return;
 	}
 
-	memset(parsed, 0, sizeof(*parsed));
 	parsed->error = check_integrity(flags, noflags);
-
-	if (parsed->error != GETO_ERROR_NONE) {
-		return;
+	if (IS_PROGRAMMER_FAULT(parsed->error)) {
+		abort_programmer_fault(parsed->error);
 	}
 
 	struct Map map = { .flagsorted = flags, .noflags = noflags };
@@ -57,7 +62,7 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 	struct GetoFlag *lastseen = NULL;
 	unsigned int positionalArgsCap = 0;
 
-	for (unsigned short i = 1; i < argc && !parsed->error; i++) {
+	for (unsigned short i = 1; (i < argc) && !parsed->error; i++) {
 		const char *argval = argv[i];
 		const size_t argvalen = strlen(argval);
 
@@ -78,7 +83,7 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 			parsed->error = parse_shortname(argval, argvalen, &map, &lastseen);
 		}
 		else if (argvalen >= 3 && *argval == '-' && argval[1] == '-' && isalnum(argval[2])) {
-			parsed->error = parse_longname(argval, argvalen, &map, &lastseen);
+			parsed->error = parse_longname(argval + 2, argvalen - 2, &map, &lastseen);
 		}
 		else if (argvalen == 2 && *argval == '-' && argval[1] == '-') {
 			parsed->nopositional = 0;
@@ -95,6 +100,18 @@ void geto_parse (const unsigned int argc, char **argv, const unsigned short nofl
 		return;
 	}
 	parsed->error = check_flags_its_arg(lastseen);
+}
+
+static void abort_programmer_fault (const enum GetoError error) {
+	static const char *const errors[] = {
+		"duplicated shortname",
+		"duplicated longname",
+		"invalid longname",
+		"invalid shortname"
+	};
+
+	fprintf(stderr, "Geto: (programmer fault): %s\nAborting now!\n", errors[error - 1]);
+	exit(EXIT_FAILURE);
 }
 
 static enum GetoError check_integrity (struct GetoFlag *flags, const unsigned short noflags) {
@@ -193,12 +210,12 @@ static enum GetoError parse_shortname (const char *argval, const size_t argvalen
 	return GETO_ERROR_NONE;
 }
 
-static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *owner) {
-	if (!owner) {
+static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *lastseen) {
+	if (!lastseen) {
 		return GETO_ERROR_UNNECESSARY_ARG;
 	}
 
-	const getopts_t opts = owner->opts;
+	const getopts_t opts = lastseen->opts;
 
 	if ((opts & ARGUMENT_NEED_MASK) == GETO_ARG_IS_NONEXISTENT) {
 		return GETO_ERROR_UNNECESSARY_ARG;
@@ -206,31 +223,31 @@ static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *ow
 
 	switch (opts & ARGUMENT_TYPE_MASK) {
 		case GETO_ARG_TYPE_TEXT: {
-			owner->argument.astext = (char*) argvalue;
+			lastseen->argument.astext = (char*) argvalue;
 			break;
 		}
 		case GETO_ARG_TYPE_DOUB: {
-			owner->argument.asdouble = strtod(argvalue, NULL);
+			lastseen->argument.asdouble = strtod(argvalue, NULL);
 			break;
 		}
 		case GETO_ARG_TYPE_UI64: {
-			owner->argument.asuint64 = strtoul(argvalue, NULL, 10);
+			lastseen->argument.asuint64 = strtoul(argvalue, NULL, 10);
 			break;
 		}
 		case GETO_ARG_TYPE_UI32: {
-			owner->argument.asuint32 = (unsigned int) strtoul(argvalue, NULL, 10);
+			lastseen->argument.asuint32 = (unsigned int) strtoul(argvalue, NULL, 10);
 			break;
 		}
 		case GETO_ARG_TYPE_SI64: {
-			owner->argument.asint64 = strtol(argvalue, NULL, 10);
+			lastseen->argument.asint64 = strtol(argvalue, NULL, 10);
 			break;
 		}
 		case GETO_ARG_TYPE_SI32: {
-			owner->argument.asint32 = (unsigned int) strtol(argvalue, NULL, 10);
+			lastseen->argument.asint32 = (signed int) strtol(argvalue, NULL, 10);
 			break;
 		}
 	}
-	owner->argset = ARG_WAS_SET;
+	lastseen->argset = ARG_WAS_SET;
 	return GETO_ERROR_NONE;
 }
 
@@ -241,38 +258,60 @@ static enum GetoError check_flags_its_arg (struct GetoFlag *flag) {
 	return GETO_ERROR_NONE;
 }
 
-static enum GetoError parse_longname (const char *argval, const size_t argvalen, struct Map *map, struct GetoFlag **owner) {
-	const unsigned short assumptionPos = normalize_alias(argval[2]);
-	const char *ogname = argval + 2;
-	const size_t cmpbytes = argvalen - 2;
-
-	*owner = NULL;
-	if (map->shortnames[assumptionPos] != NULL) {
-		const struct GetoFlag *asmpflag = map->shortnames[assumptionPos];
-		if (!strncmp(ogname, asmpflag->longname, strlen(asmpflag->longname))) {
-			*owner = map->shortnames[assumptionPos];
-			goto ownerset;
-		}
+static enum GetoError parse_longname (const char *argval, const size_t argvalen, struct Map *map, struct GetoFlag **lastseen) {
+	if (check_flags_its_arg(*lastseen)) {
+		return GETO_ERROR_MISSING_ARG;
 	}
 
-	for (unsigned short i = 0; i < map->noflags && *owner == NULL; i++) {
-		const char *flagname = map->flagsorted[i].longname;
-		const size_t length = strlen(flagname);
+	const char *adjArgument = strchr(argval, '=');
 
-		if (length != cmpbytes) {
-			continue;
-		}
-		if (!strncmp(flagname, ogname, cmpbytes)) {
-			*owner = &map->flagsorted[i];
-		}
+	if (adjArgument != NULL) {
+		*lastseen = get_longname_flag(argval, adjArgument - argval, map);
+	} else {
+		*lastseen = get_longname_flag(argval, argvalen, map);
 	}
 
-	if (*owner == NULL) {
+	if (*lastseen == NULL) {
 		return GETO_ERROR_UNKNOWN_LONG;
 	}
 
-ownerset:
-	(*owner)->seen = FLAG_WAS_SEEN;
-	(*owner)->argset = ARG_WASNT_SET;
+	(*lastseen)->seen = FLAG_WAS_SEEN;
+	(*lastseen)->argset = ARG_WASNT_SET;
+	if (adjArgument != NULL) {
+		return assign_argument(adjArgument + 1, *lastseen);
+	}
 	return GETO_ERROR_NONE;
+}
+
+static struct GetoFlag *get_longname_flag (const char *name, const size_t length, struct Map *map) {
+	const unsigned short assumptionPos = normalize_alias(*name);
+
+	/*
+	 * attempts to optimize the search by picking the first character
+	 * of the longname and see if the shortname matches with the longname
+	 * version, for example: --version => -v
+	 *                         ~          /
+	 *                          `---------'
+	 */
+	if (map->shortnames[assumptionPos] != NULL) {
+		struct GetoFlag *asmpflag = map->shortnames[assumptionPos];
+		const size_t asmplen = strlen(asmpflag->longname);
+
+		if (length == asmplen && !strncmp(name, asmpflag->longname, length)) {
+			return asmpflag;
+		}
+	}
+
+	for (unsigned short i = 0; i < map->noflags; i++) {
+		const char *flagsname = map->flagsorted[i].longname;
+
+		if (length != strlen(flagsname)) {
+			continue;
+		}
+		if (!strncmp(name, flagsname, length)) {
+			return &map->flagsorted[i];
+		}
+	}
+
+	return NULL;
 }

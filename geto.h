@@ -1,18 +1,16 @@
 #ifndef GETO_H
 #define GETO_H
 
-#define GETO_ARG_IS_NONEXISTENT 0x1
+#define GETO_ARG_IS_NONEXISTENT 0x0
 #define GETO_ARG_IS_OPTIONAL    0x1
 #define GETO_ARG_IS_MANDATORY   0x2
 
 #define GETO_ARG_TYPE_TEXT      0x4
 #define GETO_ARG_TYPE_DOUB      0x8
-#define GETO_ARG_TYPE_UI64      0x16
-#define GETO_ARG_TYPE_UI32      0x32
-#define GETO_ARG_TYPE_SI64      0x64
-#define GETO_ARG_TYPE_SI32      0x128
-
-#define GETO_IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 4))
+#define GETO_ARG_TYPE_UI64      0x10
+#define GETO_ARG_TYPE_UI32      0x20
+#define GETO_ARG_TYPE_SI64      0x40
+#define GETO_ARG_TYPE_SI32      0x80
 
 typedef unsigned short getopts_t;
 typedef unsigned char geto_flgseen_t;
@@ -31,7 +29,7 @@ enum GetoError {
 };
 
 struct GetoFlag {
-union {
+	union {
 		char *astext;
 		double asdouble;
 		unsigned long asuint64;

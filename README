@@ -1,0 +1,4 @@
+
+	GETO: Geto is a poweful argument parser for C and C++ (getopt-like library); In
+	order for you to use, just include 'geto.h' and 'geto.c' in your project folder.
+
