@@ -43,20 +43,20 @@ int main (int argc, char **argv) {
 		{
 			.longname    = "hidden",
 			.description = "does not display information",
-			.shortname   = 'h',
+			.shortname   = 'H',
 			.opts        = GETO_ARG_IS_NONEXISTENT
 		}
 	};
 
 	struct GetoParsed p;
-	geto_parse(argc, argv, 7, flags, &p);
+	geto_parse(argc, argv, flags, &p);
 
 	if (p.error != GETO_ERROR_NONE) {
 		printf("fault: %d\n", p.error);
 		return 0;
 	}
 
-	for (unsigned short i = 0; i < 7; i++) {
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
 		if (flags[i].seen) {
 			printf("parsed ok: %c (%d)\n", flags[i].shortname, flags[i].argset);
 		}

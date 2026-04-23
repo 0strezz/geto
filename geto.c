@@ -34,12 +34,11 @@
 struct Map {
 	struct GetoFlag *shortnames[26 * 2 + 10];
 	struct GetoFlag *flagsorted;
-	unsigned short noflags;
 };
 
 static void abort_programmer_fault (const enum GetoError);
 
-static enum GetoError check_integrity (struct GetoFlag*, const unsigned short);
+static enum GetoError check_integrity (struct GetoFlag*);
 static unsigned short normalize_alias (const char);
 
 static void mapflags (struct Map*);
@@ -53,18 +52,22 @@ static enum GetoError parse_longname (const char*, const size_t, struct Map*, st
 
 static struct GetoFlag *get_longname_flag (const char*, const size_t, struct Map *);
 
-void geto_parse (const unsigned int argc, char **argv, const unsigned short noflags, struct GetoFlag *flags, struct GetoParsed *parsed) {
+void geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags, struct GetoParsed *parsed) {
 	memset(parsed, 0, sizeof(*parsed));
-	if ((noflags == 0) || (flags == NULL) || (argc == 1) || (argv == NULL) || (parsed == NULL)) {
+	if ((flags == NULL) || (argc == 1) || (argv == NULL) || (parsed == NULL)) {
 		return;
 	}
 
-	parsed->error = check_integrity(flags, noflags);
+	parsed->error = check_integrity(flags);
 	if (IS_PROGRAMMER_FAULT(parsed->error)) {
 		abort_programmer_fault(parsed->error);
 	}
 
-	struct Map map = { .flagsorted = flags, .noflags = noflags };
+	/*
+	 * qsort is used in the 'mapflags' function, which means the original 'flags'
+	 * array is going to be sorted and flagsorted is just a reference to 'flags'
+	 */
+	struct Map map = { .flagsorted = flags };
 	mapflags(&map);
 
 	struct GetoFlag *lastseen = NULL;
@@ -122,10 +125,10 @@ static void abort_programmer_fault (const enum GetoError error) {
 	exit(EXIT_FAILURE);
 }
 
-static enum GetoError check_integrity (struct GetoFlag *flags, const unsigned short noflags) {
+static enum GetoError check_integrity (struct GetoFlag *flags) {
 	unsigned char aliaseen[26 * 2 + 10] = {0};
 
-	for (unsigned short i = 0; i < noflags; i++) {
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
 		const char shortname = flags[i].shortname;
 
 		if (!isalnum(shortname)) {
@@ -141,7 +144,7 @@ static enum GetoError check_integrity (struct GetoFlag *flags, const unsigned sh
 		flags[i].argset = ARG_WASNT_SET;
 	}
 
-	for (unsigned short i = 0; i < noflags; i++) {
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
 		const unsigned short pos = normalize_alias(flags[i].shortname);
 		if (aliaseen[pos]) {
 			return GETO_ERROR_DUP_SHORTNAME;
@@ -150,7 +153,7 @@ static enum GetoError check_integrity (struct GetoFlag *flags, const unsigned sh
 		const char *thisLongname = flags[i].longname;
 		const size_t thisLength = strlen(thisLongname);
 
-		for (unsigned short j = i + 1; j < noflags; j++) {
+		for (unsigned short j = i + 1; j < GETO_NUM_FLAGS; j++) {
 			const char *thatLongname = flags[j].longname;
 			const size_t thatLength = strlen(thatLongname);
 
@@ -174,13 +177,18 @@ static unsigned short normalize_alias (const char alias) {
 	if (isupper(alias)) {
 		return alias - 'A' + 26;
 	}
+
+	/*
+	 * if this function is called, it is because the program know
+	 * 'alias' satisfaces 'isalnum'
+	 */
 	return alias - '0' + 52;
 }
 
 static void mapflags (struct Map *map) {
-	qsort(map->flagsorted, map->noflags, sizeof(*map->flagsorted), cmpflg);
+	qsort(map->flagsorted, GETO_NUM_FLAGS, sizeof(*map->flagsorted), cmpflg);
 
-	for (unsigned short i = 0; i < map->noflags; i++) {
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
 		const unsigned short pos = normalize_alias(map->flagsorted[i].shortname);
 		map->shortnames[pos] = &map->flagsorted[i];
 	}
@@ -310,7 +318,7 @@ static struct GetoFlag *get_longname_flag (const char *name, const size_t length
 		}
 	}
 
-	for (unsigned short i = 0; i < map->noflags; i++) {
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
 		const char *flagsname = map->flagsorted[i].longname;
 
 		if (length != strlen(flagsname)) {

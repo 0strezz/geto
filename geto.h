@@ -22,6 +22,8 @@
  * can be run correctly
  *
  */
+#define GETO_NUM_FLAGS 7
+#define GETO_NUM_USAGE_UNITS 0
 
 typedef unsigned short getopts_t;
 typedef unsigned char geto_flgseen_t;
@@ -68,6 +70,6 @@ struct GetoParsed {
 	enum GetoError error;
 };
 
-void geto_parse (const unsigned int, char**, const unsigned short, struct GetoFlag*, struct GetoParsed*);
+void geto_parse (const unsigned int, char**, struct GetoFlag*, struct GetoParsed*);
 
 #endif
