@@ -43,7 +43,7 @@ int main (int argc, char **argv) {
 		{
 			.longname    = "hidden",
 			.description = "does not display information",
-			.shortname   = '*',
+			.shortname   = 'h',
 			.opts        = GETO_ARG_IS_NONEXISTENT
 		}
 	};

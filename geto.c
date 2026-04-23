@@ -1,5 +1,13 @@
 #include "geto.h"
 
+#ifndef GETO_NUM_FLAGS
+	#error "GETO: please define the number of flags the program has (GETO_NUM_FLAGS)."
+#endif
+
+#ifndef GETO_NUM_USAGE_UNITS
+	#error "GETO: please define the number of usage units the program has (GETO_NUM_USAGE_UNITS)."
+#endif
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -110,7 +118,7 @@ static void abort_programmer_fault (const enum GetoError error) {
 		"invalid shortname"
 	};
 
-	fprintf(stderr, "Geto: (programmer fault): %s\nAborting now!\n", errors[error - 1]);
+	fprintf(stderr, "\x1b[5m\x1b[1mGeto\x1b[0m: (programmer fault): %s\nAborting now!\n", errors[error - 1]);
 	exit(EXIT_FAILURE);
 }
 

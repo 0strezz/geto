@@ -12,6 +12,17 @@
 #define GETO_ARG_TYPE_SI64      0x40
 #define GETO_ARG_TYPE_SI32      0x80
 
+/*
+ * define bellow:
+ *
+ * GETO_NUM_FLAGS: Natural number which specifies the amount of flags the program
+ * have
+ *
+ * GETO_NUM_USAGE_UNITS: Natural number which specifies the amount of ways the program
+ * can be run correctly
+ *
+ */
+
 typedef unsigned short getopts_t;
 typedef unsigned char geto_flgseen_t;
 typedef unsigned char geto_argset_t;
