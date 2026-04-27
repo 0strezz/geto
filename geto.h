@@ -22,10 +22,10 @@
  * can be run correctly
  *
  */
-#define GETO_NUM_FLAGS 7
-#define GETO_NUM_USAGE_UNITS 0
+#define GETO_NUM_FLAGS       7
+#define GETO_NUM_USAGE_UNITS 2
 
-typedef unsigned short getopts_t;
+typedef unsigned char getopts_t;
 typedef unsigned char geto_flgseen_t;
 typedef unsigned char geto_argset_t;
 
@@ -70,6 +70,17 @@ struct GetoParsed {
 	enum GetoError error;
 };
 
+struct GetoUsage {
+	struct {
+		const char *how;
+		const char *why;
+	} units[GETO_NUM_USAGE_UNITS];
+	const char *programName;
+	const char *programDesc;
+	const char *notes;
+};
+
 void geto_parse (const unsigned int, char**, struct GetoFlag*, struct GetoParsed*);
+void geto_usage (const struct GetoUsage*, const struct GetoFlag*, const unsigned int);
 
 #endif

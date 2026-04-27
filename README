@@ -1,4 +1,80 @@
 
 	GETO: Geto is a poweful argument parser for C and C++ (getopt-like library); In
-	order for you to use, just include 'geto.h' and 'geto.c' in your project folder.
+	~~~~  order for you to use, just include 'geto.h' and 'geto.c' in your project folder.
+
+	API: Geto offers two functions for the programmer to interact with
+	~~~
+
+	* enum GetoError {
+	* 	GETO_ERROR_NONE            = 0,
+	* 	GETO_ERROR_DUP_SHORTNAME   = 1,
+	* 	GETO_ERROR_DUP_LONGNAME    = 2,
+	* 	GETO_ERROR_BAD_LONGNAME    = 3,
+	* 	GETO_ERROR_BAD_SHORTNAME   = 4,
+	* 	GETO_ERROR_UNKNOWN_SHORT   = 5,
+	* 	GETO_ERROR_UNNECESSARY_ARG = 6,
+	* 	GETO_ERROR_MISSING_ARG     = 7,
+	* 	GETO_ERROR_UNKNOWN_LONG    = 8
+	* };
+
+	This enum provides a way in which geto and the programmer can identify erros, either made by the user
+	or the programer themselves. From 1 to 4 are programmer errors, these erros will be notified in the
+	form of a error message by geto, it will interrupt the process and display the information.
+
+	From 5 to 8 are user errors, these shall be handled by the programmer using the information provided
+	by geto once the error occur.
+
+	* struct GetoFlag {
+	* 	union {
+	* 		char *astext;
+	* 		double asdouble;
+	* 		unsigned long asuint64;
+	* 		unsigned int asuint32;
+	* 		signed long asint64;
+	* 		signed int asint32;
+	* 	} argument;
+	* 	const char *longname;
+	* 	const char *description;
+	* 	const char shortname;
+	* 	const getopts_t opts;
+	* 	/*
+	* 	 * These two fields should not be initializated, the parser
+	* 	 * will set them to 0 anyway.
+	* 	 */
+	* 	geto_flgseen_t seen;
+	* 	geto_argset_t argset;
+	* };
+
+	This is the way in which a flag can be defined, the only attributes the programmer should provide
+	are:
+		- longname
+		- shortname
+		- opts: This is a single unsigned char number in which bitwise operations are performed, it stores
+		        if the flag takes or not an argument (GETO_ARG_IS_NONEXISTENT, GETO_ARG_IS_OPTIONAL,
+				GETO_ARG_IS_MANDATORY) and if it does, what type of argument it expects (GETO_ARG_TYPE_TEXT
+	            GETO_ARG_TYPE_DOUB, GETO_ARG_TYPE_UI64, GETO_ARG_TYPE_UI32, GETO_ARG_TYPE_SI64,
+				GETO_ARG_TYPE_SI32).
+
+	* struct GetoParsed {
+	* 	char *lastArgvalueSeen;
+	* 	char **positionalArgs;
+	* 	unsigned short lastArgc;
+	* 	unsigned short nopositional;
+	* 	enum GetoError error;
+	* };
+
+	This struct allows the programmer to know basic information of the parsing process such as possible errors
+	(error), positional arguments found (positionalArgs [this is allocated via calloc, therefore you will need
+	to use free when positional arguments are no longer needed])
+
+	* void geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags, struct GetoParsed *parsed);
+
+	This is the main function the programmer needs to call in order to get its flags parsed:
+		- argc: number of arguments provided at execution time
+		- argc: list arguments provided at execution time
+		- flags: flags defined for the program
+		- parsed: pointer to GetoParsed structure
+	
+	Once this function is done the programmer will be able to inspect the flags defined with the arguments given
+	(if any), what flags were seen, if there was any error
 

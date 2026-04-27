@@ -66,5 +66,22 @@ int main (int argc, char **argv) {
 		printf("pos #%d: %s\n", i, p.positionalArgs[i]);
 	}
 
+	struct GetoUsage usage = {
+		.units = {
+			{
+				.how = "[arguments] [file ..]",
+				.why = "edit specified file(s)"
+			},
+			{
+				.how = "[arguments] -",
+				.why = "read text from stdin"
+			}
+		},
+		.programName = "geto",
+		.programDesc = "argument parser for c and c++",
+		.notes = "this program works perfectly"
+	};
+
+	geto_usage(&usage, flags, fileno(stdout));
 	return 0;
 }

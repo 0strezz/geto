@@ -1,10 +1,10 @@
 #include "geto.h"
 
-#ifndef GETO_NUM_FLAGS
+#if GETO_NUM_FLAGS == 0
 	#error "GETO: please define the number of flags the program has (GETO_NUM_FLAGS)."
 #endif
 
-#ifndef GETO_NUM_USAGE_UNITS
+#if GETO_NUM_USAGE_UNITS == 0
 	#error "GETO: please define the number of usage units the program has (GETO_NUM_USAGE_UNITS)."
 #endif
 
@@ -111,6 +111,40 @@ void geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags, s
 		return;
 	}
 	parsed->error = check_flags_its_arg(lastseen);
+}
+
+void geto_usage (const struct GetoUsage *u, const struct GetoFlag *flags, const unsigned fd) {
+	if (!u) {
+		return;
+	}
+	dprintf(fd, "%s - %s (%s %s)\n\nUsage:\n", u->programName, u->programDesc, __DATE__, __TIME__);
+
+	unsigned short lngstHow = 0, lngstflag = 0;
+	for (unsigned short i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
+		const unsigned short howlen = (unsigned short) strlen(u->units[i].how);
+		if (lngstHow < howlen) {
+			lngstHow = howlen;
+		}
+	}
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
+		const unsigned short flglen = ((unsigned short) strlen(flags[i].longname)) + 8;
+		if (lngstflag < flglen) {
+			lngstflag = flglen;
+		}
+	}
+
+	const unsigned short finalpadd = (lngstHow > lngstflag) ? lngstHow : lngstflag - 3;
+	for (unsigned short i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
+		dprintf(fd, "\t%s %-*s   %s\n", u->programName, finalpadd, u->units[i].how, u->units[i].why);
+	}
+	dprintf(fd, "Arguments:\n");
+	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
+		dprintf(fd, "\t-%c or --%-*s   %s\n", flags[i].shortname, finalpadd - 3, flags[i].longname, flags[i].description);
+	}
+
+	if (u->notes) {
+		dprintf(fd, "Notes:\n\t%s\n", u->notes);
+	}
 }
 
 static void abort_programmer_fault (const enum GetoError error) {
