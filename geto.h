@@ -22,7 +22,7 @@
  * can be run correctly
  *
  */
-#define GETO_NUM_FLAGS       7
+#define GETO_NUM_FLAGS       3
 #define GETO_NUM_USAGE_UNITS 2
 
 typedef unsigned char getopts_t;
@@ -63,9 +63,9 @@ struct GetoFlag {
 };
 
 struct GetoParsed {
+	struct GetoFlag *lastFlagSeen;
 	char *lastArgvalueSeen;
 	char **positionalArgs;
-	unsigned short lastArgc;
 	unsigned short nopositional;
 	enum GetoError error;
 };
@@ -80,7 +80,8 @@ struct GetoUsage {
 	const char *notes;
 };
 
-void geto_parse (const unsigned int, char**, struct GetoFlag*, struct GetoParsed*);
-void geto_usage (const struct GetoUsage*, const struct GetoFlag*, const unsigned int);
+struct GetoParsed geto_parse (const unsigned int, char**, struct GetoFlag*);
+void geto_usage (const unsigned short, const struct GetoUsage*, const struct GetoFlag*);
+void geto_error (const char*, const unsigned short, const struct GetoParsed);
 
 #endif

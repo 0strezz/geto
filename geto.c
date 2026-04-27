@@ -52,15 +52,17 @@ static enum GetoError parse_longname (const char*, const size_t, struct Map*, st
 
 static struct GetoFlag *get_longname_flag (const char*, const size_t, struct Map *);
 
-void geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags, struct GetoParsed *parsed) {
-	memset(parsed, 0, sizeof(*parsed));
-	if ((flags == NULL) || (argc == 1) || (argv == NULL) || (parsed == NULL)) {
-		return;
+struct GetoParsed geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags) {
+	struct GetoParsed parsed;
+	memset(&parsed, 0, sizeof(parsed));
+
+	if ((flags == NULL) || (argc == 1) || (argv == NULL)) {
+		return parsed;
 	}
 
-	parsed->error = check_integrity(flags);
-	if (IS_PROGRAMMER_FAULT(parsed->error)) {
-		abort_programmer_fault(parsed->error);
+	parsed.error = check_integrity(flags);
+	if (IS_PROGRAMMER_FAULT(parsed.error)) {
+		abort_programmer_fault(parsed.error);
 	}
 
 	/*
@@ -70,50 +72,48 @@ void geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags, s
 	struct Map map = { .flagsorted = flags };
 	mapflags(&map);
 
-	struct GetoFlag *lastseen = NULL;
 	unsigned int positionalArgsCap = 0;
-
-	for (unsigned short i = 1; (i < argc) && !parsed->error; i++) {
+	for (unsigned short i = 1; (i < argc) && !parsed.error; i++) {
 		const char *argval = argv[i];
 		const size_t argvalen = strlen(argval);
 
-		parsed->lastArgvalueSeen = (char*) argval;
-		parsed->lastArgc = i;
-
+		parsed.lastArgvalueSeen = (char*) argval;
 		if (positionalArgsCap != 0) {
-			if (positionalArgsCap == parsed->nopositional) {
+			if (positionalArgsCap == parsed.nopositional) {
 				positionalArgsCap += POSITIONAL_ARGS_GROW_FACTOR;
-				parsed->positionalArgs = (char**) reallocarray(parsed->positionalArgs, positionalArgsCap, sizeof(*parsed->positionalArgs));
-				assert(parsed->positionalArgs);
+				parsed.positionalArgs = (char**) reallocarray(parsed.positionalArgs, positionalArgsCap, sizeof(*parsed.positionalArgs));
+				assert(parsed.positionalArgs);
 			}
 
-			parsed->positionalArgs[parsed->nopositional++] = (char*) argval;
+			parsed.positionalArgs[parsed.nopositional++] = (char*) argval;
 			continue;
 		}
 		if (argvalen >= 2 && *argval == '-' && isalnum(argval[1])) {
-			parsed->error = parse_shortname(argval, argvalen, &map, &lastseen);
+			parsed.error = parse_shortname(argval, argvalen, &map, &parsed.lastFlagSeen);
 		}
 		else if (argvalen >= 3 && *argval == '-' && argval[1] == '-' && isalnum(argval[2])) {
-			parsed->error = parse_longname(argval + 2, argvalen - 2, &map, &lastseen);
+			parsed.error = parse_longname(argval + 2, argvalen - 2, &map, &parsed.lastFlagSeen);
 		}
 		else if (argvalen == 2 && *argval == '-' && argval[1] == '-') {
-			parsed->nopositional = 0;
-			parsed->positionalArgs = (char**) calloc(POSITIONAL_ARGS_GROW_FACTOR, sizeof(*parsed->positionalArgs));
+			parsed.nopositional = 0;
+			parsed.positionalArgs = (char**) calloc(POSITIONAL_ARGS_GROW_FACTOR, sizeof(*parsed.positionalArgs));
 			positionalArgsCap = POSITIONAL_ARGS_GROW_FACTOR;
-			assert(parsed->positionalArgs);
+			assert(parsed.positionalArgs);
 		}
 		else {
-			parsed->error = assign_argument(argval, lastseen);
+			parsed.error = assign_argument(argval, parsed.lastFlagSeen);
 		}
 	}
 
-	if (parsed->error != GETO_ERROR_NONE) {
-		return;
+	if (parsed.error != GETO_ERROR_NONE) {
+		return parsed;
 	}
-	parsed->error = check_flags_its_arg(lastseen);
+
+	parsed.error = check_flags_its_arg(parsed.lastFlagSeen);
+	return parsed;
 }
 
-void geto_usage (const struct GetoUsage *u, const struct GetoFlag *flags, const unsigned fd) {
+void geto_usage (const unsigned short fd, const struct GetoUsage *u, const struct GetoFlag *flags) {
 	if (!u) {
 		return;
 	}
@@ -144,6 +144,49 @@ void geto_usage (const struct GetoUsage *u, const struct GetoFlag *flags, const 
 
 	if (u->notes) {
 		dprintf(fd, "Notes:\n\t%s\n", u->notes);
+	}
+}
+
+void geto_error (const char *pn, const unsigned short fd, const struct GetoParsed gp) {
+	switch (gp.error) {
+		case GETO_ERROR_UNKNOWN_SHORT:
+		case GETO_ERROR_UNKNOWN_LONG: {
+			dprintf(
+				fd,
+				"%s:usage:error: unknown flag encountered.\n"
+				"\t`%s` is not recognized as a program option.\n"
+				"\tPlease check usage.\n",
+				pn,
+				gp.lastArgvalueSeen
+			);
+			break;
+		}
+		case GETO_ERROR_UNNECESSARY_ARG: {
+			dprintf(
+				fd,
+				"%s:usage:error: unnecesary argument provided.\n"
+				"\t`%s` (%c) flag does take any argument, yet `%s` was given.\n"
+				"\tPlease check usage.\n",
+				pn,
+				gp.lastFlagSeen->longname,
+				gp.lastFlagSeen->shortname,
+				gp.lastArgvalueSeen
+			);
+			break;
+		}
+		case GETO_ERROR_MISSING_ARG: {
+			dprintf(
+				fd,
+				"%s:usage:error: missing argument.\n"
+				"\t`%s` (%c) flag takes an argument, yet none was given.\n"
+				"\tPlease check usage.\n",
+				pn,
+				gp.lastFlagSeen->longname,
+				gp.lastFlagSeen->shortname
+			);
+			break;
+		}
+		default: { break; }
 	}
 }
 
