@@ -5,5 +5,5 @@
 	[x]	parse positional arguments
 	[x]	accept multiple shortflags -abc
 	[x]	accept = in long flags --filename=file.txt
-	[ ]	test
+	[x]	test
 

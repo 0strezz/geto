@@ -83,5 +83,6 @@ struct GetoUsage {
 struct GetoParsed geto_parse (const unsigned int, char**, struct GetoFlag*);
 void geto_usage (const unsigned short, const struct GetoUsage*, const struct GetoFlag*);
 void geto_error (const char*, const unsigned short, const struct GetoParsed);
+void geto_free_posargs (struct GetoParsed*);
 
 #endif

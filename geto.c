@@ -190,6 +190,14 @@ void geto_error (const char *pn, const unsigned short fd, const struct GetoParse
 	}
 }
 
+void geto_free_posargs (struct GetoParsed *gp) {
+	if (!gp || gp->positionalArgs) {
+		return;
+	}
+	free(gp->positionalArgs);
+	gp->nopositional = 0;
+}
+
 static void abort_programmer_fault (const enum GetoError error) {
 	static const char *const errors[] = {
 		"duplicated shortname",
