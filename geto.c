@@ -25,7 +25,7 @@
 
 #define POSITIONAL_ARGS_GROW_FACTOR 0x8
 
-#define IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 4))
+#define IS_PROGRAMMER_FAULT(ec) (((ec) >= 1) && ((ec) <= 6))
 
 /*
  * defines a simple mapper in which the parser can access flags
@@ -39,7 +39,7 @@ struct Map {
 static void abort_programmer_fault (const enum GetoError);
 
 static enum GetoError check_integrity (struct GetoFlag*);
-static unsigned short normalize_alias (const char);
+static uint16_t normalize_alias (const char);
 
 static void mapflags (struct Map*);
 static int cmpflg (const void*, const void*);
@@ -52,15 +52,14 @@ static enum GetoError parse_longname (const char*, const size_t, struct Map*, st
 
 static struct GetoFlag *get_longname_flag (const char*, const size_t, struct Map *);
 
-struct GetoParsed geto_parse (const unsigned int argc, char **argv, struct GetoFlag *flags) {
+struct GetoParsed geto_parse (const uint32_t argc, char **argv, struct GetoFlag *flags) {
 	struct GetoParsed parsed;
 	memset(&parsed, 0, sizeof(parsed));
 
-	if ((flags == NULL) || (argc == 1) || (argv == NULL)) {
+	parsed.error = check_integrity(flags);
+	if ((argc == 1) || (argv == NULL)) {
 		return parsed;
 	}
-
-	parsed.error = check_integrity(flags);
 	if (IS_PROGRAMMER_FAULT(parsed.error)) {
 		abort_programmer_fault(parsed.error);
 	}
@@ -72,8 +71,8 @@ struct GetoParsed geto_parse (const unsigned int argc, char **argv, struct GetoF
 	struct Map map = { .flagsorted = flags };
 	mapflags(&map);
 
-	unsigned int positionalArgsCap = 0;
-	for (unsigned short i = 1; (i < argc) && !parsed.error; i++) {
+	uint32_t positionalArgsCap = 0;
+	for (uint16_t i = 1; (i < argc) && !parsed.error; i++) {
 		const char *argval = argv[i];
 		const size_t argvalen = strlen(argval);
 
@@ -113,32 +112,32 @@ struct GetoParsed geto_parse (const unsigned int argc, char **argv, struct GetoF
 	return parsed;
 }
 
-void geto_usage (const unsigned short fd, const struct GetoUsage *u, const struct GetoFlag *flags) {
+void geto_usage (const uint16_t fd, const struct GetoUsage *u, const struct GetoFlag *flags) {
 	if (!u) {
 		return;
 	}
 	dprintf(fd, "%s - %s (%s %s)\n\nUsage:\n", u->programName, u->programDesc, __DATE__, __TIME__);
 
-	unsigned short lngstHow = 0, lngstflag = 0;
-	for (unsigned short i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
-		const unsigned short howlen = (unsigned short) strlen(u->units[i].how);
+	uint16_t lngstHow = 0, lngstflag = 0;
+	for (uint16_t i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
+		const uint16_t howlen = (uint16_t) strlen(u->units[i].how);
 		if (lngstHow < howlen) {
 			lngstHow = howlen;
 		}
 	}
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
-		const unsigned short flglen = ((unsigned short) strlen(flags[i].longname)) + 8;
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
+		const uint16_t flglen = ((uint16_t) strlen(flags[i].longname)) + 8;
 		if (lngstflag < flglen) {
 			lngstflag = flglen;
 		}
 	}
 
-	const unsigned short finalpadd = (lngstHow > lngstflag) ? lngstHow : lngstflag - 3;
-	for (unsigned short i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
+	const uint16_t finalpadd = (lngstHow > lngstflag) ? lngstHow : lngstflag - 3;
+	for (uint16_t i = 0; i < GETO_NUM_USAGE_UNITS; i++) {
 		dprintf(fd, "\t%s %-*s   %s\n", u->programName, finalpadd, u->units[i].how, u->units[i].why);
 	}
 	dprintf(fd, "Arguments:\n");
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
 		dprintf(fd, "\t-%c or --%-*s   %s\n", flags[i].shortname, finalpadd - 3, flags[i].longname, flags[i].description);
 	}
 
@@ -147,7 +146,7 @@ void geto_usage (const unsigned short fd, const struct GetoUsage *u, const struc
 	}
 }
 
-void geto_error (const char *pn, const unsigned short fd, const struct GetoParsed gp) {
+void geto_error (const char *pn, const uint16_t fd, const struct GetoParsed gp) {
 	switch (gp.error) {
 		case GETO_ERROR_UNKNOWN_SHORT:
 		case GETO_ERROR_UNKNOWN_LONG: {
@@ -191,7 +190,7 @@ void geto_error (const char *pn, const unsigned short fd, const struct GetoParse
 }
 
 void geto_free_posargs (struct GetoParsed *gp) {
-	if (!gp || gp->positionalArgs) {
+	if (!gp || gp->positionalArgs == 0) {
 		return;
 	}
 	free(gp->positionalArgs);
@@ -203,7 +202,9 @@ static void abort_programmer_fault (const enum GetoError error) {
 		"duplicated shortname",
 		"duplicated longname",
 		"invalid longname",
-		"invalid shortname"
+		"invalid shortname",
+		"flag argument's type not specified",
+		"null array of flags given"
 	};
 
 	fprintf(stderr, "\x1b[5m\x1b[1mGeto\x1b[0m: (programmer fault): %s\nAborting now!\n", errors[error - 1]);
@@ -211,9 +212,12 @@ static void abort_programmer_fault (const enum GetoError error) {
 }
 
 static enum GetoError check_integrity (struct GetoFlag *flags) {
-	unsigned char aliaseen[26 * 2 + 10] = {0};
+	if (!flags) {
+		return GETO_ERROR_BAD_NULL_FLAGS;
+	}
 
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
+	uint8_t aliaseen[26 * 2 + 10] = {0};
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
 		const char shortname = flags[i].shortname;
 
 		if (!isalnum(shortname)) {
@@ -229,16 +233,21 @@ static enum GetoError check_integrity (struct GetoFlag *flags) {
 		flags[i].argset = ARG_WASNT_SET;
 	}
 
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
-		const unsigned short pos = normalize_alias(flags[i].shortname);
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
+		const uint16_t pos = normalize_alias(flags[i].shortname);
 		if (aliaseen[pos]) {
 			return GETO_ERROR_DUP_SHORTNAME;
+		}
+
+		const getopts_t opts = flags[i].opts;
+		if (((opts & ARGUMENT_NEED_MASK) != GETO_ARG_IS_NONEXISTENT) && !(opts & ARGUMENT_TYPE_MASK)) {
+			return GETO_ERROR_BAD_ARG_TYPE;
 		}
 
 		const char *thisLongname = flags[i].longname;
 		const size_t thisLength = strlen(thisLongname);
 
-		for (unsigned short j = i + 1; j < GETO_NUM_FLAGS; j++) {
+		for (uint16_t j = i + 1; j < GETO_NUM_FLAGS; j++) {
 			const char *thatLongname = flags[j].longname;
 			const size_t thatLength = strlen(thatLongname);
 
@@ -255,7 +264,7 @@ static enum GetoError check_integrity (struct GetoFlag *flags) {
 	return GETO_ERROR_NONE;
 }
 
-static unsigned short normalize_alias (const char alias) {
+static uint16_t normalize_alias (const char alias) {
 	if (islower(alias)) {
 		return alias - 'a';
 	}
@@ -273,8 +282,8 @@ static unsigned short normalize_alias (const char alias) {
 static void mapflags (struct Map *map) {
 	qsort(map->flagsorted, GETO_NUM_FLAGS, sizeof(*map->flagsorted), cmpflg);
 
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
-		const unsigned short pos = normalize_alias(map->flagsorted[i].shortname);
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
+		const uint16_t pos = normalize_alias(map->flagsorted[i].shortname);
 		map->shortnames[pos] = &map->flagsorted[i];
 	}
 }
@@ -293,7 +302,7 @@ static enum GetoError parse_shortname (const char *argval, const size_t argvalen
 
 	for (size_t i = 1; i < argvalen; i++) {
 		const char name = argval[i];
-		const unsigned short pos = normalize_alias(name);
+		const uint16_t pos = normalize_alias(name);
 
 		if (map->shortnames[pos] == 0) {
 			return GETO_ERROR_UNKNOWN_SHORT;
@@ -336,7 +345,7 @@ static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *la
 			break;
 		}
 		case GETO_ARG_TYPE_UI32: {
-			lastseen->argument.asuint32 = (unsigned int) strtoul(argvalue, NULL, 10);
+			lastseen->argument.asuint32 = (uint32_t) strtoul(argvalue, NULL, 10);
 			break;
 		}
 		case GETO_ARG_TYPE_SI64: {
@@ -344,7 +353,7 @@ static enum GetoError assign_argument (const char *argvalue, struct GetoFlag *la
 			break;
 		}
 		case GETO_ARG_TYPE_SI32: {
-			lastseen->argument.asint32 = (signed int) strtol(argvalue, NULL, 10);
+			lastseen->argument.asint32 = (int32_t) strtol(argvalue, NULL, 10);
 			break;
 		}
 	}
@@ -385,7 +394,7 @@ static enum GetoError parse_longname (const char *argval, const size_t argvalen,
 }
 
 static struct GetoFlag *get_longname_flag (const char *name, const size_t length, struct Map *map) {
-	const unsigned short assumptionPos = normalize_alias(*name);
+	const uint16_t assumptionPos = normalize_alias(*name);
 
 	/*
 	 * attempts to optimize the search by picking the first character
@@ -403,7 +412,7 @@ static struct GetoFlag *get_longname_flag (const char *name, const size_t length
 		}
 	}
 
-	for (unsigned short i = 0; i < GETO_NUM_FLAGS; i++) {
+	for (uint16_t i = 0; i < GETO_NUM_FLAGS; i++) {
 		const char *flagsname = map->flagsorted[i].longname;
 
 		if (length != strlen(flagsname)) {
