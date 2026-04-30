@@ -39,7 +39,6 @@ enum GetoError {
 	GETO_ERROR_BAD_SHORTNAME   = 4,
 	GETO_ERROR_BAD_ARG_TYPE    = 5,
 	GETO_ERROR_BAD_NULL_FLAGS  = 6,
-
 	GETO_ERROR_UNKNOWN_SHORT   = 7,
 	GETO_ERROR_UNNECESSARY_ARG = 8,
 	GETO_ERROR_MISSING_ARG     = 9,
@@ -87,7 +86,7 @@ struct GetoUsage {
 
 struct GetoParsed geto_parse (const uint32_t, char**, struct GetoFlag*);
 void geto_usage (const uint16_t, const struct GetoUsage*, const struct GetoFlag*);
-void geto_error (const char*, const uint16_t, const struct GetoParsed);
+void geto_error (const uint16_t, const char*, const struct GetoParsed);
 void geto_free_posargs (struct GetoParsed*);
 
 #endif

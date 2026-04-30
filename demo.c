@@ -31,7 +31,7 @@ int main (int argc, char **argv) {
 
 	struct GetoParsed gp = geto_parse(argc, argv, flags);
 	if (gp.error != GETO_ERROR_NONE) {
-		geto_error("sm", fileno(stderr), gp);
+		geto_error(fileno(stderr), "sm", gp);
 		return 0;
 	}
 
