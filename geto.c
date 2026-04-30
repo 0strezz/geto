@@ -146,7 +146,7 @@ void geto_usage (const uint16_t fd, const struct GetoUsage *u, const struct Geto
 	}
 }
 
-void geto_error (const uint16_t fd, const char *pn, const struct GetoParsed gp) {
+void geto_error (const char *pn, const uint16_t fd, const struct GetoParsed gp) {
 	switch (gp.error) {
 		case GETO_ERROR_UNKNOWN_SHORT:
 		case GETO_ERROR_UNKNOWN_LONG: {
@@ -425,3 +425,4 @@ static struct GetoFlag *get_longname_flag (const char *name, const size_t length
 
 	return NULL;
 }
+

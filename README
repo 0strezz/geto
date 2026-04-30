@@ -23,4 +23,3 @@
 
 	$: positional arguments are allocated via calloc, therefore it is responsability of the
 	programmer to free such memory, it can be done via calling `geto_free_posargs` or manually.
-
